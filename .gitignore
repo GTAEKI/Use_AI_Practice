@@ -3,3 +3,5 @@ env/
 cache.db
 files/
 .cache
+secrets.toml
+.streamlit
