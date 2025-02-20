@@ -68,7 +68,7 @@ llm = ChatOpenAI(
     streaming=True,
     callbacks=[
         ChatCallbackHandler(),
-    ]
+    ],
 )
 
 # Memory
@@ -115,14 +115,8 @@ def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
 
 def load_memory(_):
-    chat_history = memory.load_memory_variables({})["chat_history"]
+    return memory.load_memory_variables({})["chat_history"]
 
-    if not chat_history:
-        return []
-    
-    return [
-        msg if isinstance(msg, BaseMessage) else HumanMessage(content=msg) for msg in chat_history
-    ]
 
 prompt = ChatPromptTemplate.from_messages([
     ("system","""
@@ -157,7 +151,7 @@ if file:
     if message:
         send_message(message,"human")
         chain = {"context":retriever | RunnableLambda(format_docs),
-                 "chat_history": RunnableLambda(lambda _: load_memory(_)),
+                 "chat_history": load_memory,
                  "question": RunnablePassthrough()} | prompt | llm
 
         with st.chat_message("ai"):
