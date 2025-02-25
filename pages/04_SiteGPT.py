@@ -7,8 +7,46 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 import streamlit as st
 
+
+st.set_page_config(
+    page_title="CloudflareGPT",
+    page_icon="🖥️",
+)
+
+st.markdown(
+    """
+    # CloudflareGPT
+            
+    Ask questions about the content of Cloudflare
+            
+    Start by writing the OpenAI API key of the website on the sidebar.
+
+    You could get information about AI Gateway, Cloudflare Vectorize, and Workers AI.
+"""
+)
+
+
+with st.sidebar:
+    url = "https://developers.cloudflare.com/sitemap-0.xml"
+    openai_api_key = st.text_input("Enter Open API key", type="password")
+    st.sidebar.markdown("[GitHub Repository](https://github.com/GTAEKI/Use_AI_Practice.git)")
+
+if not openai_api_key:
+    st.error("Please input your API key")
+    st.stop()
+
+import openai
+openai.api_key = openai_api_key
+
+try:
+    openai.Model.list()
+except Exception as e:
+    st.error("API key is invalid. Please check your API key.")
+    st.stop()
+
 llm = ChatOpenAI(
     temperature=0.1,
+    openai_api_key=openai_api_key
 )
 
 answers_prompt = ChatPromptTemplate.from_template(
@@ -44,12 +82,6 @@ def get_answers(inputs):
     docs = inputs["docs"]
     question = inputs["question"]
     answers_chain = answers_prompt | llm
-    # answers = []
-    # for doc in docs:
-    #     result = answers_chain.invoke(
-    #         {"question": question, "context": doc.page_content}
-    #     )
-    #     answers.append(result.content)
     return {
         "question": question,
         "answers": [
@@ -58,7 +90,7 @@ def get_answers(inputs):
                     {"question": question, "context": doc.page_content}
                 ).content,
                 "source": doc.metadata["source"],
-                #"date": doc.metadata["lastmod"],
+                "date": doc.metadata["lastmod"],
             }
             for doc in docs
         ],
@@ -75,6 +107,7 @@ choose_prompt = ChatPromptTemplate.from_messages(
             Use the answers that have the highest score (more helpful) and favor the most recent ones.
 
             Cite sources and return the sources of the answers as they are, do not change them.
+            If you have absolutely no idea about the user's question, you don't have to provide sources.
 
             Answers: {answers}
             """,
@@ -88,12 +121,8 @@ def choose_answer(inputs):
     answers = inputs["answers"]
     question = inputs["question"]
     choose_chain = choose_prompt | llm
-    # condensed = "\n\n".join(
-    #     f"{answer['answer']}\nSource:{answer['source']}\nDate:{answer['date']}\n"
-    #     for answer in answers
-    # )
     condensed = "\n\n".join(
-        f"{answer['answer']}\nSource:{answer['source']}\n"
+        f"{answer['answer']}\nSource:{answer['source']}\nDate:{answer['date']}\n"
         for answer in answers
     )
     return choose_chain.invoke(
@@ -127,6 +156,9 @@ def load_website(url):
     )
     loader = SitemapLoader(
         url,
+        filter_urls=[
+            r'https?://.*(?:ai-gateway|vectorize|workers-ai).*'
+        ],
         parsing_function=parse_page,
     )
     loader.requests_per_second = 2
@@ -134,29 +166,6 @@ def load_website(url):
     vector_store = FAISS.from_documents(docs, OpenAIEmbeddings())
     return vector_store.as_retriever()
 
-
-st.set_page_config(
-    page_title="SiteGPT",
-    page_icon="🖥️",
-)
-
-
-st.markdown(
-    """
-    # SiteGPT
-            
-    Ask questions about the content of a website.
-            
-    Start by writing the URL of the website on the sidebar.
-"""
-)
-
-
-with st.sidebar:
-    url = st.text_input(
-        "Write down a URL",
-        placeholder="https://example.com",
-    )
 
 
 if url:
